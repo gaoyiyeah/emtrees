@@ -8,13 +8,12 @@ import numpy
 import emtreesc
   
 # Split a dataset based on an attribute and an attribute value
-def test_split(index, value, dataset):
-    left, right = list(), list()
-    for row in dataset:
-        if row[index] < value:
-            left.append(row)
-        else:
-            right.append(row)
+def test_split(feature, value, dataset):
+    m = dataset[:,feature] < value
+    left = dataset[m]
+    right = dataset[numpy.logical_not(m)]
+
+    #assert left[:,feature].max() <= value <= right[:,feature].min()
     return left, right
  
 # Calculate the Gini index for a split dataset
@@ -39,7 +38,8 @@ def gini_index(groups, classes):
  
 # Select the best split point for a dataset
 def get_split(dataset, n_features):
-    class_values = list(set(row[-1] for row in dataset))
+
+    class_values = list(numpy.unique(dataset[:,-1])) # FIXME: pass down
     b_index, b_value, b_score, b_groups = 999, 999, 999, None
     features = list()
     while len(features) < n_features:
@@ -63,22 +63,26 @@ def to_terminal(group):
 def split(node, max_depth, min_size, n_features, depth):
     left, right = node['groups']
     del(node['groups'])
+
     # check for a no split
-    if not left or not right:
-        node['left'] = node['right'] = to_terminal(left + right)
+    left_samples = left.shape[0]
+    right_samples = right.shape[0]
+
+    if not left_samples or not right_samples:
+        node['left'] = node['right'] = to_terminal(numpy.concatenate((left, right)))
         return
     # check for max depth
     if depth >= max_depth:
         node['left'], node['right'] = to_terminal(left), to_terminal(right)
         return
     # process left child
-    if len(left) <= min_size:
+    if left_samples <= min_size:
         node['left'] = to_terminal(left)
     else:
         node['left'] = get_split(left, n_features)
         split(node['left'], max_depth, min_size, n_features, depth+1)
     # process right child
-    if len(right) <= min_size:
+    if right_samples <= min_size:
         node['right'] = to_terminal(right)
     else:
         node['right'] = get_split(right, n_features)
@@ -314,14 +318,11 @@ def generate_c_forest(forest, name='myclassifier'):
 
 # Create a random subsample from the dataset with replacement
 def subsample(dataset, ratio):
-    sample = list()
-    n_sample = round(len(dataset) * ratio)
-    while len(sample) < n_sample:
-        index = random.randrange(len(dataset))
-        sample.append(dataset[index])
-    return sample
- 
-import copy
+    n_samples = round(len(dataset) * ratio)
+    selected_rows = numpy.random.choice(dataset.shape[0], size=n_samples, replace=True)
+    s = dataset[selected_rows]
+    return s
+
  
 # TODO: implement max_nodes limit
 class RandomForest:
@@ -414,7 +415,6 @@ class RandomForest:
         if numpy.isinf(X.astype(float)).any():
             raise ValueError('X contains inf')
 
-        print(X.shape, self.input_features_)
         if X.shape[1] != self.input_features_:
             raise ValueError('Expected {} features, got {}'.format(self.input_features_, X.shape[1]))
 
