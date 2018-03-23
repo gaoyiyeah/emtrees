@@ -22,6 +22,8 @@ def gini_index(groups, classes):
     left, right = groups
     n_instances = float(left.shape[0] + right.shape[0])
 
+    # print('index', len(groups), len(classes), n_instances)
+
     # sum weighted Gini index for each group
     gini = 0.0
     for group in groups:
@@ -31,9 +33,12 @@ def gini_index(groups, classes):
             continue
         score = 0.0
         # score the group based on the score for each class
+
         for class_val in classes:
-            p = [row[-1] for row in group].count(class_val) / size
+            c = numpy.count_nonzero(group[:,-1] == class_val)
+            p = c2 / size
             score += p * p
+
         # weight the group score by its relative size
         gini += (1.0 - score) * (size / n_instances)
     return gini
@@ -51,12 +56,12 @@ def get_split(dataset, n_features):
             features.append(index)
 
     for feature in features:
-        for row in dataset:
-            groups = test_split(feature, row[feature], dataset)
+        for value in dataset[:,feature]:
+            groups = test_split(feature, value, dataset)
             gini = gini_index(groups, class_values)
 
             if gini < b_score:
-                b_index, b_value, b_score, b_groups = feature, row[feature], gini, groups
+                b_index, b_value, b_score, b_groups = feature, value, gini, groups
 
     return {'index':b_index, 'value':b_value, 'groups':b_groups}
  
